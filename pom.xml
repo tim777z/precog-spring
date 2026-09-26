@@ -41,7 +41,7 @@
     <maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
     <checkstyle.version>10.12.4</checkstyle.version>
     <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
-    <dependency-check-maven.version>12.1.0</dependency-check-maven.version>
+    <dependency-check-maven.version>13.0.0</dependency-check-maven.version>
 
     <!--
       Coverage gate. The service layer is the only place business logic lives, so it is
