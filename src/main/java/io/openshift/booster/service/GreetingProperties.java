@@ -16,17 +16,36 @@
 
 package io.openshift.booster.service;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.annotation.Validated;
 
+/**
+ * Externalised greeting configuration, normally supplied by a Kubernetes ConfigMap.
+ *
+ * <p>The constraints below are validated during context refresh. Without them a ConfigMap
+ * that is absent, empty or mistyped booted successfully and only failed on the first
+ * request, which reads as an application fault in production and turns a configuration
+ * mistake into a stream of 500s.
+ */
 @Component
+@Validated
 @ConfigurationProperties("greeting")
 public class GreetingProperties {
 
     /**
-     * This message has to be set in the application.yml file. If application is executed locally, "local" profile is
-     * expected. On OpenShift, this property is set by a ConfigMap.
+     * The greeting message. It must contain exactly one {@code %s} placeholder, which is
+     * replaced with the caller's name, and no other percent signs.
+     *
+     * <p>Defaults come from {@code src/main/resources/application.yml}. Locally that file
+     * provides the value; on OpenShift it is supplied by a ConfigMap, whose contents take
+     * precedence over the classpath.
      */
+    @NotBlank(message = "greeting.message must be set (application.yml or a ConfigMap)")
+    @Size(max = GreetingTemplate.MAX_TEMPLATE_LENGTH,
+            message = "greeting.message must not exceed " + GreetingTemplate.MAX_TEMPLATE_LENGTH + " characters")
     private String message = null;
 
     public String getMessage() {

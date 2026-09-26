@@ -1,5 +1,46 @@
+# Local development stack.
+#
+#   cp .env.example .env   # then edit; .env is git-ignored
+#   docker compose up --build
+#
+# The previous version of this file declared `build: .` with no Dockerfile in the
+# repository, so `docker compose up` failed outright.
+
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Bound to loopback by default. Override with BIND_ADDRESS=0.0.0.0 to expose it, and
+    # only do that behind a TLS-terminating proxy or an ingress with authentication -- the
+    # service has no authentication of its own.
     ports:
-      - "8080:8080"
+      - "${BIND_ADDRESS:-127.0.0.1}:8080:8080"
+    environment:
+      # Spring Boot relaxed binding maps GREETING_MESSAGE onto greeting.message, so this is
+      # the same property the OpenShift ConfigMap sets. Exactly one %s placeholder, and no
+      # other percent signs: anything else is rejected at start-up by design.
+      GREETING_MESSAGE: "${GREETING_MESSAGE:-Hello, %s!}"
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE:-}"
+    # The application writes nothing to its filesystem. A read-only root turns a container
+    # escape that tries to drop a payload or rewrite a jar into an immediate, obvious
+    # failure.
+    read_only: true
+    tmpfs:
+      - /tmp
+    # No new privileges from setuid binaries, and drop every capability the JVM never uses.
+    # The process binds an unprivileged port and needs no chown, dac_override or net_raw.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Give PID 1 a real init to reap zombies and, more importantly, to forward SIGTERM so
+    # graceful shutdown can drain in-flight requests.
+    init: true
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped

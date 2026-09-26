@@ -1,0 +1,20 @@
+# Keep the build context small and, more importantly, keep secrets out of it. Anything
+# listed here is invisible to the Docker daemon, so a stray .env can never be captured in
+# an image layer or leaked to a registry.
+#
+# Note: config/ is NOT excluded. The Maven build runs checkstyle during `validate`, so the
+# ruleset has to be present in the context for `docker build` to succeed.
+.git
+.github
+.idea
+.vscode
+*.iml
+target
+src/licenses
+docker-compose.yml
+Dockerfile
+.dockerignore
+.env
+.env.*
+*.log
+*.md

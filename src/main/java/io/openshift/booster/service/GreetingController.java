@@ -16,28 +16,59 @@
  */
 package io.openshift.booster.service;
 
-import java.util.Objects;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.RequestMapping;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.MediaType;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * Read-only greeting endpoint.
+ *
+ * <p>The bean-validation constraints on {@code name} reference the same limits the service
+ * enforces. They exist so an over-long or hostile value is answered with a structured
+ * {@code 400} before it reaches business logic; {@link GreetingService} remains the
+ * authoritative check for callers that bypass this controller.
+ */
 @RestController
+@Validated
 public class GreetingController {
 
-    private GreetingProperties properties;
+    private static final Logger LOG = LoggerFactory.getLogger(GreetingController.class);
 
-    @Autowired
-    public GreetingController(GreetingProperties properties) {
-        this.properties = properties;
+    private final GreetingService service;
+
+    public GreetingController(GreetingService service) {
+        this.service = service;
     }
 
-    @RequestMapping("/api/greeting")
-    public Greeting greeting(@RequestParam(value = "name", defaultValue = "World") String name) {
-        Objects.requireNonNull(properties.getMessage(), "Greeting message was not set in the properties");
+    /**
+     * Greets a caller-supplied name.
+     *
+     * <p>Mapped with {@code @GetMapping} rather than bare {@code @RequestMapping}: the
+     * endpoint is side-effect free, so it should not answer {@code POST}, {@code PUT} or
+     * {@code DELETE}. That keeps it unreachable from a cross-origin form or fetch without
+     * a preflight, and stops a mutating verb from being a no-op that only looks successful.
+     *
+     * @param name the name to greet; defaults to {@code World}
+     * @return the greeting
+     */
+    @GetMapping(path = "/api/greeting", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Greeting greeting(
+            @RequestParam(name = "name", defaultValue = "World")
+            @Size(min = 1, max = GreetingService.MAX_NAME_LENGTH,
+                    message = "name must be between 1 and " + GreetingService.MAX_NAME_LENGTH + " characters")
+            @Pattern(regexp = GreetingService.NAME_REGEX, message = "name contains unsupported characters")
+            String name) {
 
-        String message = String.format(properties.getMessage(), name);
-        return new Greeting(message);
+        final Greeting greeting = service.greet(name);
+        // Lengths only: the name and the message are caller data and do not belong in logs.
+        LOG.info("GET /api/greeting -> 200 (name {} characters, response {} characters)",
+                name.length(), greeting.content().length());
+        return greeting;
     }
 }
