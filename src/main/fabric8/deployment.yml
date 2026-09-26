@@ -1,8 +1,15 @@
+# OpenShift DeploymentConfig fragment.
+#
+# It patches the generated DeploymentConfig rather than replacing it, so it carries only
+# what this service needs: the ConfigMap mount and a hardened container spec. The
+# securityContext below matches the container image, which already runs as a non-root user
+# with a read-only root filesystem -- restating it in the manifest means a cluster
+# administrator sees the intent instead of having to read the Dockerfile to discover it.
 spec:
   template:
     spec:
-      # Declare a volume mounting the config map
       volumes:
+        # Declare a volume mounting the config map
         - configMap:
             # Name of the config map
             name: app-config
@@ -13,8 +20,15 @@ spec:
               path: application.yml
             # Volume name (used as reference below)
           name: config
+        # The container runs with a read-only root filesystem, so it needs one writable
+        # scratch path. In-memory rather than on disk: nothing here should outlive the pod.
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
       containers:
-        - env:
+        - name: spring-boot
+          env:
             - name: KUBERNETES_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -25,3 +39,43 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /deployments/config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          # The actuator probes are unauthenticated, which is why show-details is `never`
+          # in application.yml: a liveness probe has nowhere to put a credential.
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              # No CPU limit on purpose: CFS throttling on a JVM shows up as latency spikes
+              # that are indistinguishable from an application fault. Memory is capped,
+              # because exceeding it really is fatal.
+              memory: 512Mi
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault

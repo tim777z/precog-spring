@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Structured console logging.
+
+  Self-contained on purpose: no logstash-encoder dependency, so there is no extra
+  third-party jar in the runtime classpath purely for formatting. The pattern is
+  single-line and field-stable, which is what a log shipper needs:
+
+      <timestamp> <LEVEL> [<app>] [<traceId>] <logger> - <message>
+
+  Timestamps are UTC so that logs from multiple replicas interleave correctly, and the
+  correlation slot is an MDC key rather than the request URI or parameters, so caller
+  input can never be used to forge a log line.
+-->
+<configuration>
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="precog"/>
+    <springProperty scope="context" name="ROOT_LEVEL" source="logging.level.root" defaultValue="INFO"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{yyyy-MM-dd'T'HH:mm:ss.SSS,UTC} %-5level [${APP_NAME}] [%X{traceId}] %logger{40} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Application logs are chatty at DEBUG; leave them off outside dev/test. -->
+    <springProfile name="!prod">
+        <logger name="io.openshift.booster" level="DEBUG"/>
+    </springProfile>
+
+    <!-- In-cluster noise floor: the framework's own request-mapping chatter. -->
+    <logger name="org.springframework.web.servlet.mvc.method.annotation" level="WARN"/>
+
+    <root level="${ROOT_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+</configuration>

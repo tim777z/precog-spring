@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Checkstyle rules for PreCog Spring.
+
+  Deliberately conservative: this gates every build, so it only encodes rules that catch
+  real defects (unused/duplicate imports, missing braces, error-prone equality and boolean
+  expressions, stray debugging output) plus a small set of naming and whitespace
+  conventions. It is intentionally not a style wish-list. Formatting noise in a blocking
+  lint gate trains teams to bypass the gate.
+-->
+<module name="Checker">
+  <property name="severity" value="warning"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!-- Files -->
+  <module name="NewlineAtEndOfFile"/>
+  <module name="FileTabCharacter">
+    <property name="eachLine" value="true"/>
+  </module>
+  <module name="LineLength">
+    <property name="max" value="120"/>
+    <property name="ignorePattern" value="^\s*\*.*https?://|^\s*//.*https?://"/>
+  </module>
+  <module name="RegexpSingleline">
+    <property name="format" value="\s+$"/>
+    <property name="message" value="Line has trailing whitespace."/>
+  </module>
+
+  <!--
+    Log through SLF4J, never stdout/stderr. Losing log lines to an interleaved console
+    stream is a real operational problem once the service runs in a cluster.
+  -->
+  <module name="RegexpSingleline">
+    <property name="format" value="System\.(out|err)\.print"/>
+    <property name="message" value="Use an SLF4J logger instead of System.out/System.err."/>
+  </module>
+
+  <module name="TreeWalker">
+    <module name="AvoidStarImport"/>
+    <module name="RedundantImport"/>
+    <module name="UnusedImports">
+      <property name="processJavadoc" value="true"/>
+    </module>
+
+    <!-- Naming -->
+    <module name="ConstantName"/>
+    <module name="LocalVariableName"/>
+    <module name="MethodName"/>
+    <module name="PackageName"/>
+    <module name="ParameterName"/>
+    <module name="TypeName"/>
+    <module name="OuterTypeFilename"/>
+
+    <!-- Braces and modifiers -->
+    <module name="LeftCurly"/>
+    <module name="NeedBraces"/>
+    <module name="RightCurly"/>
+    <module name="ModifierOrder"/>
+
+    <!-- Correctness -->
+    <module name="EmptyStatement"/>
+    <module name="EqualsHashCode"/>
+    <module name="MissingSwitchDefault"/>
+    <module name="SimplifyBooleanExpression"/>
+    <module name="SimplifyBooleanReturn"/>
+    <module name="StringLiteralEquality"/>
+
+    <!-- Whitespace / literals -->
+    <module name="NoWhitespaceBefore"/>
+    <module name="ArrayTypeStyle"/>
+    <module name="UpperEll"/>
+  </module>
+</module>

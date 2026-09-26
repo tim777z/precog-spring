@@ -1,0 +1,64 @@
+# Default application configuration.
+#
+# Precedence (highest last): command line, environment variables, external config file
+# (SPRING_CONFIG_PATH / -Dspring.config.location), ./config/, packaged classpath.
+# On OpenShift the ConfigMap is mounted at /deployments/config and pointed at by
+# SPRING_BOOT_CONFIG_PATH, so its application.yml wins over the values below.
+spring:
+  application:
+    name: precog
+  lifecycle:
+    # Drain in-flight requests before the process exits, instead of dropping connections
+    # mid-response on a rolling deploy or scale-down.
+    timeout-per-shutdown-phase: 20s
+
+server:
+  port: 8080
+  # Honour X-Forwarded-* from an ingress/load balancer that terminates TLS.
+  forward-headers-strategy: framework
+  shutdown: graceful
+  error:
+    # Never return internals to the caller. A stack trace names framework versions, internal
+    # class names and build paths, which turns a probing request into a targeted exploit.
+    # The detail stays in the server log, correlated by path and timestamp.
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    whitelabel:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        # Explicit allow-list. Anything not named here is not reachable over HTTP; the
+        # dangerous actuator endpoints (env, configprops, beans, heapdump, threaddump,
+        # loggers, shutdown) are excluded on purpose. env and configprops in particular
+        # render configuration values, which is how actuator leaks secrets.
+        include: health,info,metrics
+  endpoint:
+    health:
+      # Report the aggregate status only. Component-level detail (database URLs, disk
+      # paths, downstream hostnames) is useful to an attacker and useless to a liveness
+      # probe.
+      show-details: never
+      # /actuator/health/liveness and /actuator/health/readiness for Kubernetes probes.
+      probes:
+        enabled: true
+  info:
+    env:
+      # /actuator/env is never exposed; keep it off even if the include list changes.
+      enabled: false
+  metrics:
+    tags:
+      application: precog
+
+info:
+  app:
+    name: Spring Boot ConfigMap Booster
+    description: Greeting service whose message is externalised through a ConfigMap
+
+# Fail fast on a ConfigMap that is absent, blank or over-long: the context will not start
+# and the reason is written to the log, instead of every later request returning a 500.
+greeting:
+  message: "Hello, %s!"

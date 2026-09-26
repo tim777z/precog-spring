@@ -17,13 +17,17 @@
 package io.openshift.booster.service;
 
 /**
- * Response body for {@code GET /api/greeting}.
+ * Raised when the caller-supplied greeting name is not acceptable.
  *
- * <p>A record makes the payload immutable, which is all a read-only response ever needs, and
- * removes the no-argument-plus-setter shape that previously allowed a half-built instance
- * (and a {@code null} content) to be serialised.
- *
- * @param content the rendered greeting
+ * <p>Kept as its own type so the web layer can map it to {@code 400 Bad Request} without
+ * the risk of a blanket {@code IllegalArgumentException} handler masking genuine server
+ * faults as client errors.
  */
-public record Greeting(String content) {
+public class InvalidGreetingNameException extends IllegalArgumentException {
+
+    private static final long serialVersionUID = 1L;
+
+    public InvalidGreetingNameException(final String message) {
+        super(message);
+    }
 }

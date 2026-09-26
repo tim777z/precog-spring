@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check suppressions.
+
+  Every entry MUST carry a justification and an expiry date. A suppression without one is
+  an undocumented, permanent hole in the CVE gate; entries past their expiry date should
+  fail review so they are either re-justified or the dependency is fixed.
+
+  This file is intentionally empty: no known-unfixed CVE is currently being suppressed.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <!--
+  <suppress until="2026-12-31Z">
+    <notes><![CDATA[
+      Example entry. Replace with a real suppression that cites the CVE id, the reason the
+      finding does not apply to this deployment, and the compensating control.
+    ]]></notes>
+    <packageUrl regex="true">^pkg:maven/org\.example/[^@]+@[^/]+$</packageUrl>
+    <cve>CVE-0000-00000</cve>
+  </suppress>
+  -->
+</suppressions>

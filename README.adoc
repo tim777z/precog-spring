@@ -1,29 +1,38 @@
 = PreCog Spring
 
-Java 17+ Spring Boot application for PreCog Security.
+Java 17+ Spring Boot service for PreCog Security. The greeting message is externalised
+through a Kubernetes ConfigMap, so it can be changed on a running deployment without a
+rebuild.
+
+Full documentation, API reference and security notes: link:README.md[README.md].
 
 == Prerequisites
 
-- Java 17+
-- Maven 3.8+
+- Java 17 or newer (enforced by `maven-enforcer-plugin`)
+- Maven 3.8.0 or newer
+
+No JDK 8, no OpenShift cluster and no `oc` login are required.
 
 == Quick Start
 
 [source,bash]
 ----
-mvn clean install
-mvn spring-boot:run
+mvn -B verify            # checkstyle + tests + coverage gate
+mvn spring-boot:run      # http://localhost:8080
 ----
 
 == API Endpoints
 
-- `GET /api/health` - Health check
-- `POST /api/scan` - Submit code for security scanning
+- `GET /api/greeting` - greeting message; optional `name` query parameter (1-64 characters)
+- `GET /actuator/health` - aggregate health status
+- `GET /actuator/health/liveness` - Kubernetes liveness probe
+- `GET /actuator/health/readiness` - Kubernetes readiness probe
+- `GET /actuator/info` - build information
+- `GET /` - bundled browser UI
+
+Configuration is supplied through `greeting.message` (environment variable
+`GREETING_MESSAGE`, or a ConfigMap). See `.env.example` and the README.
 
 == License
 
-Proprietary — PreCog Security
-
-== Contact
-
-timlangeveldt@gmail.com
+Apache License 2.0 - see link:LICENSE[LICENSE].
