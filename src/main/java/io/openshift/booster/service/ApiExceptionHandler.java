@@ -48,6 +48,12 @@ public class ApiExceptionHandler {
 
     private static final String GENERIC_SERVER_ERROR = "The request could not be completed.";
 
+    /**
+     * Used for a 4xx/5xx code that is not in the {@link HttpStatus} registry, so no standard
+     * phrase exists to look up.
+     */
+    private static final String GENERIC_REJECTION = "The request was rejected.";
+
     private final Clock clock;
 
     public ApiExceptionHandler() {
@@ -100,7 +106,7 @@ public class ApiExceptionHandler {
                 return respond(status, "server_error", GENERIC_SERVER_ERROR, request);
             }
             LOG.debug("Request {} {} rejected: {}", request.getMethod(), request.getRequestURI(), ex.toString());
-            return respond(status, "request_rejected", status.getReasonPhrase(), request);
+            return respond(status, "request_rejected", reasonPhrase(status), request);
         }
 
         LOG.error("Request {} {} failed with an unhandled exception", request.getMethod(), request.getRequestURI(), ex);
@@ -115,5 +121,23 @@ public class ApiExceptionHandler {
         final ApiError body =
                 new ApiError(code, message, request.getRequestURI(), Instant.now(clock));
         return ResponseEntity.status(status).body(body);
+    }
+
+    /**
+     * Maps a status code to a human-readable phrase.
+     *
+     * <p>{@link HttpStatusCode} is an interface and deliberately carries no reason phrase --
+     * only {@link HttpStatus}, the enum of registered codes, has one. A code outside that
+     * registry has no phrase at all, so the lookup is by value and falls back to a constant.
+     *
+     * <p>Deriving the phrase from the registry rather than from the exception keeps the
+     * response body free of caller-influenced text: the only strings that can reach the client
+     * this way are the fixed phrases declared in {@link HttpStatus}. An unknown code cannot be
+     * echoed back either, which is what stops a custom {@code HttpStatusCode} implementation
+     * from smuggling a string from the request into the error body.
+     */
+    private static String reasonPhrase(final HttpStatusCode status) {
+        final HttpStatus registered = HttpStatus.resolve(status.value());
+        return registered == null ? GENERIC_REJECTION : registered.getReasonPhrase();
     }
 }

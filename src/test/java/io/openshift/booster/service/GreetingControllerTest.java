@@ -88,10 +88,25 @@ class GreetingControllerTest {
     }
 
     @Test
-    void rejectsAnEmptyName() throws Exception {
+    @DisplayName("a present but empty parameter falls back to the documented default")
+    void treatsAnEmptyParameterAsAbsent() throws Exception {
+        // Spring substitutes @RequestParam(defaultValue=...) whenever the resolved value is
+        // empty, not only when the parameter is missing, so ?name= is answered with the
+        // default rather than rejected. Pinned here because it is easy to assume otherwise and
+        // then assert a 400 that the framework will never produce.
         mockMvc.perform(get("/api/greeting").param("name", ""))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").value("Hello, World!"));
+    }
+
+    @Test
+    void rejectsABlankName() throws Exception {
+        // Whitespace survives the default-value substitution, so this reaches the service,
+        // which trims it and rejects the result.
+        mockMvc.perform(get("/api/greeting").param("name", "   "))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").exists());
+                .andExpect(jsonPath("$.code").value("invalid_name"))
+                .andExpect(jsonPath("$.path").value("/api/greeting"));
     }
 
     @Test

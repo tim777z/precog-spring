@@ -22,8 +22,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.web.server.ResponseStatusException;
@@ -95,6 +97,36 @@ class ApiExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody().message()).doesNotContain("pool exhausted");
+    }
+
+    @Test
+    @DisplayName("answers a registered status with its standard phrase")
+    void usesTheStandardReasonPhraseForARegisteredStatus() {
+        final ResponseEntity<ApiError> response = handler.handleUnexpected(
+                new ResponseStatusException(HttpStatus.METHOD_NOT_ALLOWED, "POST"), request());
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        // Asserted against the enum rather than a literal, so the test states the contract
+        // ("the phrase comes from the registry") instead of restating a constant.
+        assertThat(response.getBody().code()).isEqualTo("request_rejected");
+        assertThat(response.getBody().message()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED.getReasonPhrase());
+    }
+
+    /**
+     * A status code outside the {@code HttpStatus} registry has no standard reason phrase.
+     * The body must still be a fixed sentence: the phrase is looked up by value so that
+     * nothing a caller can influence reaches the response.
+     */
+    @Test
+    @DisplayName("falls back to a fixed phrase for a status code with no registered phrase")
+    void usesAFixedPhraseForAnUnregisteredStatus() {
+        final ResponseEntity<ApiError> response = handler.handleUnexpected(
+                new ResponseStatusException(HttpStatusCode.valueOf(499), "token=hunter2"), request());
+
+        assertThat(response.getStatusCode().value()).isEqualTo(499);
+        assertThat(response.getBody().code()).isEqualTo("request_rejected");
+        assertThat(response.getBody().message()).isEqualTo("The request was rejected.");
+        assertThat(response.getBody().message()).doesNotContain("hunter2");
     }
 
     private static HttpServletRequest request() {

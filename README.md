@@ -117,6 +117,10 @@ and `SecurityHeadersFilter` adds the response headers described under
 | --------- | ------ | -------- | -------- | -------------------------------------------------------- |
 | `name`    | string | no       | `World`  | 1–64 characters, letters/marks/digits/spaces and `. , ' - _` |
 
+An absent `name` and a present-but-empty one (`?name=`) are answered with the default: Spring
+substitutes `defaultValue` for both, and the two are indistinguishable at the controller. A name
+that is only whitespace survives that substitution, is trimmed, and is then rejected with `400`.
+
 Responses:
 
 | Status | Body                                              | Cause                                        |
@@ -316,6 +320,12 @@ What this service does about the attacks it is plausibly exposed to:
   secret. The retired `Jenkinsfile` loaded a third-party shared library from
   `fabric8io/fabric8-pipeline-library@master` — unpinned remote code executing inside the
   build, which is a supply-chain compromise waiting to happen.
+- **A dependency gate on every pull request.** `dependency-review` compares the dependencies a
+  pull request adds or bumps against the GitHub advisory database and fails the change on a
+  known vulnerability or a licence the project has not accepted, so a compromised or
+  typosquatted artifact cannot reach `main` on a green test run. The actions themselves are
+  pinned to the majors that run on Node 24, because the previous pins still targeted the
+  retired Node 20 runtime and were being force-migrated on every run.
 
 ## Migration from the 1.x booster layout
 
