@@ -314,6 +314,13 @@ What this service does about the attacks it is plausibly exposed to:
 - **Bounded input.** `name` is capped at 64 characters counted in code points (so an astral
   character cannot slip past by occupying two UTF-16 units) and `greeting.message` at 512.
   Neither is logged: both are caller or operator data.
+- **Forwarded headers are trusted, and that has a boundary.**
+  `server.forward-headers-strategy=framework` makes the service believe `X-Forwarded-For` and
+  `X-Forwarded-Proto`, which is what an ingress or TLS-terminating proxy needs. Exposed
+  directly, those headers are attacker-supplied and the recorded client address and scheme
+  are whatever the caller claims. Keep the service behind a proxy that overwrites them, or set
+  the strategy to `none` and accept that the scheme and client address then come from the
+  socket.
 - **Method restriction.** `/api/greeting` answers `GET` only. Accepting every verb made it
   reachable from a cross-origin form post with no preflight, and returned a misleading 200.
 - **Least-privilege CI.** `permissions: contents: read` at the workflow level; no job reads a
@@ -323,9 +330,15 @@ What this service does about the attacks it is plausibly exposed to:
 - **A dependency gate on every pull request.** `dependency-review` compares the dependencies a
   pull request adds or bumps against the GitHub advisory database and fails the change on a
   known vulnerability or a licence the project has not accepted, so a compromised or
-  typosquatted artifact cannot reach `main` on a green test run. The actions themselves are
-  pinned to the majors that run on Node 24, because the previous pins still targeted the
-  retired Node 20 runtime and were being force-migrated on every run.
+  typosquatted artifact cannot reach `main` on a green test run. Two deliberate details: the
+  action runs with `warn-only` and a step of the workflow decides pass or fail from its output,
+  because the action cannot run at all unless an administrator has enabled
+  **Settings → Code security → Dependency graph** — a repository setting, not a code change.
+  A real finding therefore still blocks on any repository where the graph is on, while a
+  missing platform feature produces a notice in the run log instead of a pull request that is
+  red for the wrong reason. The actions are pinned to the majors that run on Node 24, because
+  the previous pins still targeted the retired Node 20 runtime and were being force-migrated on
+  every run.
 
 ## Migration from the 1.x booster layout
 

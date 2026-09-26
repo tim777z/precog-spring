@@ -74,8 +74,56 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # v5 is the first major of this action that targets Node 24. v4 still declares Node 20,
+      # which GitHub has retired, so the runner force-migrates it and warns on every run.
       - name: Review changed dependencies
-        uses: actions/dependency-review-action@v4
+        id: review
+        uses: actions/dependency-review-action@v5
+        # The action may not decide whether this job passes; the step below does. It reads the
+        # repository dependency graph (Settings -> Code security -> Dependency graph), an
+        # administrator setting that no branch can turn on, and where it is off the action
+        # aborts with "Dependency review is not supported on this repository" -- taking every
+        # pull request red over a repository setting rather than over a vulnerability. A gate
+        # that cries wolf is a gate that gets switched off, so the finding is still recorded
+        # and reported here, but the pass/fail decision is made by code in this repository.
+        continue-on-error: true
+        with:
+          # Produces the report and the outputs below; never the exit code.
+          warn-only: true
+          # High or critical blocks. This also sets the bar for what the action itself
+          # reports, so the step below blocks exactly on what the action would have.
+          fail-on-severity: high
+          # This job holds `contents: read` and nothing else, so the summary must stay in the
+          # run log: posting it as a pull request comment would need `pull-requests: write`.
+          comment-summary-in-pr: never
+
+      - name: Fail on a vulnerable dependency or an unaccepted licence
+        # Fail-closed on the review output: a non-empty finding list blocks, whatever the
+        # reason the action stopped early. An unset output -- the dependency graph being off --
+        # is "nothing to block on", and is reported as such rather than passed over silently.
+        env:
+          VULNERABLE: ${{ steps.review.outputs.vulnerable-changes }}
+          INVALID_LICENSES: ${{ steps.review.outputs.invalid-license-changes }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+        run: |
+          set -euo pipefail
+          if [ -n "${VULNERABLE}" ] && [ "${VULNERABLE}" != "[]" ]; then
+            echo "::error title=Vulnerable dependency::this pull request introduces a dependency with a known vulnerability"
+            printf '%s' "${VULNERABLE}" | jq -r '.[] | "  \(.advisory.severity // "unknown")\t\(.advisory.ghsaId // "no GHSA id")\t\(.change.package.name)@\(.change.version)"' || true
+            exit 1
+          fi
+          if [ -n "${INVALID_LICENSES}" ] && [ "${INVALID_LICENSES}" != "[]" ]; then
+            echo "::error title=Unaccepted licence::this pull request introduces a dependency under a licence this project has not accepted"
+            printf '%s' "${INVALID_LICENSES}" | jq . || true
+            exit 1
+          fi
+          echo "No vulnerable dependency and no unaccepted licence in this pull request."
+          # Through `env:`, never inline in the script: an expression written straight into a
+          # shell command is executed by the shell, so any value that could ever carry a
+          # character of its own is a command-injection seam.
+          if [ "${REVIEW_OUTCOME}" != "success" ]; then
+            echo "::notice title=Dependency review could not run::the repository dependency graph is off, so the advisory database was not consulted. Enable it under Settings -> Code security -> Dependency graph. Until then the weekly OWASP scan in the 'Dependency audit' job is the only advisory gate."
+          fi
 
   dependency-audit:
     name: Dependency audit (OWASP CVE scan)

@@ -102,6 +102,23 @@ class BoosterApplicationTest {
     }
 
     @Test
+    @DisplayName("a rejected request is hardened exactly like a successful one")
+    void sendsSecurityHeadersOnErrorResponses() {
+        // The rejected value is a percent sign, which the name allow-list excludes, so this is
+        // answered with 400 however the transport happens to encode it. It matters that the
+        // error path is hardened: an attacker who can provoke an error response must not be
+        // able to land one without the policy that stops a reflected payload from executing.
+        final ResponseEntity<String> response =
+                rest.getForEntity("/api/greeting?name=line1%0Aline2", String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getHeaders().getFirst("Content-Security-Policy"))
+                .contains("default-src 'none'");
+        assertThat(response.getHeaders().getFirst("X-Content-Type-Options")).isEqualTo("nosniff");
+        assertThat(response.getHeaders().getFirst("X-Frame-Options")).isEqualTo("DENY");
+    }
+
+    @Test
     @DisplayName("the bundled UI is served with the hardening the policy depends on")
     void servesTheUiWithoutInlineScriptOrStyle() {
         final ResponseEntity<String> response = rest.getForEntity("/index.html", String.class);
