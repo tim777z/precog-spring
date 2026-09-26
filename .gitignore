@@ -1,3 +1,15 @@
+# Secrets and local configuration. A committed .env is the most common way a credential
+# reaches a public repository: the file is harmless in isolation and the damage is already
+# done by the time a scanner notices.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+secrets/
+
 # IntelliJ
 .idea
 *.iml
@@ -11,6 +23,10 @@ target
 bin
 tmp
 
+# VS Code
+.vscode
+
 # OS generated files #
 ######################
 .DS_Store?
+Thumbs.db

@@ -1,34 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2016-2017 Red Hat, Inc, and individual contributors.
+  Copyright 2016-2017 Red Hat, Inc, and individual contributors.
 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
 
- http://www.apache.org/licenses/LICENSE-2.0
+  http://www.apache.org/licenses/LICENSE-2.0
 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
+
   <parent>
-    <groupId>io.openshift.booster</groupId>
-    <artifactId>spring-boot-booster-parent</artifactId>
-    <version>1.5.12-3-rhoar</version>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.5.0</version>
+    <relativePath/>
   </parent>
+
   <artifactId>precog</artifactId>
   <groupId>io.openshift.booster</groupId>
   <version>1.0.0</version>
   <name>Spring Boot - ConfigMap Booster</name>
-  <description>Spring Boot - ConfigMap Booster</description>
+  <description>Spring Boot service whose greeting message is externalised through a Kubernetes ConfigMap</description>
+
   <properties>
-    <openshift-client.version>3.1.8</openshift-client.version>
+    <java.version>17</java.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <!-- Reproducible builds: every plugin and tool version is pinned, never resolved from a range. -->
+    <maven.compiler.release>17</maven.compiler.release>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
+    <maven-checkstyle-plugin.version>3.3.1</maven-checkstyle-plugin.version>
+    <checkstyle.version>10.12.4</checkstyle.version>
+    <jacoco-maven-plugin.version>0.8.12</jacoco-maven-plugin.version>
+    <dependency-check-maven.version>12.1.0</dependency-check-maven.version>
+
+    <!--
+      Coverage gate. The service layer is the only place business logic lives, so it is
+      held to a high bar; the thin controller/DTO layer is gated separately.
+    -->
+    <jacoco.service.coverage>0.80</jacoco.service.coverage>
+    <jacoco.total.coverage>0.70</jacoco.total.coverage>
   </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -38,48 +60,182 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-validation</artifactId>
+    </dependency>
+
     <!-- Testing -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.jboss.arquillian.junit</groupId>
-      <artifactId>arquillian-junit-standalone</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.arquillian.cube</groupId>
-      <artifactId>arquillian-cube-openshift</artifactId>
-      <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <groupId>io.undertow</groupId>
-          <artifactId>undertow-core</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>io.fabric8</groupId>
-      <artifactId>openshift-client</artifactId>
-      <version>${openshift-client.version}</version>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
+
   <build>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven-enforcer-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-toolchain</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireJavaVersion>
+                  <version>[17,)</version>
+                  <message>Build requires JDK 17 or newer. See README.md &gt; Prerequisites.</message>
+                </requireJavaVersion>
+                <requireMavenVersion>
+                  <version>[3.8.0,)</version>
+                  <message>Build requires Maven 3.8.0 or newer. See README.md &gt; Prerequisites.</message>
+                </requireMavenVersion>
+                <banDuplicatePomDependencyVersions/>
+                <!-- Never resolve a SNAPSHOT into a release build: snapshots are not reproducible. -->
+                <requireReleaseDeps>
+                  <message>Release builds must not depend on SNAPSHOT artifacts.</message>
+                </requireReleaseDeps>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+        <version>${maven-checkstyle-plugin.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>com.puppycrawl.tools</groupId>
+            <artifactId>checkstyle</artifactId>
+            <version>${checkstyle.version}</version>
+          </dependency>
+        </dependencies>
         <configuration>
-          <profiles>
-            <profile>local</profile>
-          </profiles>
-          <classifier>exec</classifier>
+          <configLocation>${project.basedir}/config/checkstyle.xml</configLocation>
+          <includeTestSourceDirectory>true</includeTestSourceDirectory>
+          <consoleOutput>true</consoleOutput>
+          <failOnViolation>true</failOnViolation>
+          <failsOnError>true</failsOnError>
+          <violationSeverity>warning</violationSeverity>
+          <logViolationsToConsole>true</logViolationsToConsole>
         </configuration>
+        <executions>
+          <execution>
+            <id>checkstyle-validate</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco-maven-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>jacoco-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>jacoco-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <haltOnFailure>true</haltOnFailure>
+              <rules>
+                <rule>
+                  <element>PACKAGE</element>
+                  <includes>
+                    <include>io.openshift.booster.service</include>
+                  </includes>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.service.coverage}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.total.coverage}</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
-</project>
 
+  <profiles>
+    <!--
+      CVE scanning. Kept out of `mvn verify` on purpose: the OWASP plugin downloads and
+      syncs the full NVD, which takes many minutes and fails on flaky networks. CI runs it
+      from a scheduled workflow instead of blocking every pull request.
+    -->
+    <profile>
+      <id>security-audit</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.owasp</groupId>
+            <artifactId>dependency-check-maven</artifactId>
+            <version>${dependency-check-maven.version}</version>
+            <configuration>
+              <failBuildOnCVSS>7</failBuildOnCVSS>
+              <formats>
+                <format>HTML</format>
+                <format>JSON</format>
+              </formats>
+              <suppressionFiles>
+                <suppressionFile>config/dependency-check-suppressions.xml</suppressionFile>
+              </suppressionFiles>
+            </configuration>
+            <executions>
+              <execution>
+                <id>dependency-check</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>aggregate</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

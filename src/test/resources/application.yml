@@ -1,3 +1,0 @@
-# Unit tests does not need config map
-greeting:
-  message: "Hello, %s!"

@@ -16,14 +16,19 @@
  */
 package io.openshift.booster.service;
 
+import java.time.Instant;
+
 /**
- * Response body for {@code GET /api/greeting}.
+ * Uniform error body for the JSON API.
  *
- * <p>A record makes the payload immutable, which is all a read-only response ever needs, and
- * removes the no-argument-plus-setter shape that previously allowed a half-built instance
- * (and a {@code null} content) to be serialised.
+ * <p>Deliberately free of exception types, messages and stack traces: a client gets a
+ * stable machine-readable code plus a safe human sentence, and the operator gets the detail
+ * in the server log where it cannot be used to fingerprint the stack.
  *
- * @param content the rendered greeting
+ * @param code      stable, machine-readable error identifier
+ * @param message   human-readable, safe to return to the caller
+ * @param path      request path the error relates to
+ * @param timestamp when the error was produced, in UTC
  */
-public record Greeting(String content) {
+public record ApiError(String code, String message, String path, Instant timestamp) {
 }

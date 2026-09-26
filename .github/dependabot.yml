@@ -1,0 +1,35 @@
+# Automated dependency maintenance.
+#
+# Security patches to Spring Boot and its transitive tree land in Maven Central constantly;
+# without this the service silently drifts further from support with every passing build.
+# Grouped pull requests keep a weekly batch reviewable, and the "applicability" schedule
+# spreads the load so Dependabot does not open five PRs on the same morning.
+version: 2
+
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    commit-message:
+      prefix: 'build(deps)'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "05:30"
+      timezone: Etc/UTC
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: 'ci(deps)'
