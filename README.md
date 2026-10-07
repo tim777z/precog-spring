@@ -186,6 +186,27 @@ Logging is structured, single-line and UTC, via `src/main/resources/logback-spri
 
 Set the level with the standard property, for example `logging.level.io.openshift.booster=DEBUG`.
 
+### Error tracking
+
+This demo service does **not** forward exceptions to an external error aggregator (Sentry,
+Datadog, Elastic APM, etc.). The rationale:
+
+- The service is a read-only greeting endpoint behind a ConfigMap, intended to demonstrate
+  externalised configuration on OpenShift. It has no authentication, no database, no
+  downstream services, and no business logic that would produce actionable 5xx faults.
+- `ApiExceptionHandler` logs every 5xx with its full stack trace via SLF4J (see
+  `logback-spring.xml` for the structured format). The log line contains the method, path,
+  timestamp, and exception — enough to correlate and debug in a log shipper.
+- Adding an error tracker would introduce a third-party dependency, a DSN secret, and
+  network egress — all of which widen the supply-chain and operational surface for a
+  service whose purpose is to be minimal and auditable.
+
+If you deploy this service in a context where centralised error tracking is required, add a
+Micrometer `MeterFilter` or a `HandlerExceptionResolver` that increments a counter and/or
+pushes to your aggregator, and add a corresponding test in `ApiExceptionHandlerTest`
+asserting the counter increments. The decision is documented here so a future maintainer
+does not treat the absence as an oversight.
+
 ## Testing
 
 ```bash

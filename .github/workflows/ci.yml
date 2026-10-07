@@ -42,11 +42,16 @@ jobs:
           cache: maven
           cache-dependency-path: pom.xml
 
-      # `verify` runs the full gate: enforcer (JDK/Maven floor) -> checkstyle -> unit and
-      # slice tests -> JaCoCo report and coverage thresholds. Lint is no longer a separate
-      # optional step, so style regressions cannot reach main behind a green test run.
-      - name: Build and verify
-        run: mvn -B verify
+      # Discrete steps for failure visibility and independent caching. Each step fails fast
+      # with a clear label so the job list shows exactly which gate broke.
+      - name: Lint (checkstyle)
+        run: mvn -B checkstyle:check
+
+      - name: Test (unit and slice tests)
+        run: mvn -B test
+
+      - name: Coverage gate (JaCoCo report and thresholds)
+        run: mvn -B jacoco:report jacoco:check
 
       - name: Upload JaCoCo coverage report
         if: always()
@@ -56,8 +61,21 @@ jobs:
           path: target/site/jacoco/
           retention-days: 14
           # `warn`, not `error`: the coverage gate itself is enforced by jacoco:check inside
-          # `mvn verify`, so this step only publishes evidence. Failing the run because the
+          # the coverage step, so this step only publishes evidence. Failing the run because the
           # report is missing would report the same red twice and hide the real Maven failure.
+          if-no-files-found: warn
+
+      - name: Generate and upload dependency tree
+        if: always()
+        run: mvn -B dependency:tree -DoutputFile=dependency-tree.txt
+
+      - name: Upload dependency tree
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: dependency-tree
+          path: dependency-tree.txt
+          retention-days: 30
           if-no-files-found: warn
 
   dependency-review:
@@ -155,3 +173,24 @@ jobs:
           path: target/dependency-check-report.html
           retention-days: 30
           if-no-files-found: warn
+
+  dependency-updates:
+    name: Dependency updates (informational)
+    # Runs weekly on the same schedule as the audit. Does not fail the build; the output
+    # surfaces outdated majors so maintainers can triage them in a batch PR.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      - name: Display dependency updates
+        run: mvn -B versions:display-dependency-updates versions:display-plugin-updates
